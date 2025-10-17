@@ -1,2 +1,13 @@
 # RESTFUL-API-DEVELOPMENT
-Library Management REST API (CODTECH Task 2): Python/Flask API providing full CRUD operations (GET, POST, PUT, DELETE) for a Book Inventory resource. Implements professional JSON handling and RESTful routing structure.
+
+*COMPANY NAME*: CODTECH IT SOLUTIONS PVT.LTD
+
+*NAME*: SAIMON SHAIKH
+
+*INTERN ID*: CT06DR437
+
+*DOMAIN NAME*: SOFTWARE DEVELOPMENT
+
+*DURATION*: 6 WEEKS
+
+*MENTOR NAME*: NEELA SANTOSH
