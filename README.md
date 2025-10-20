@@ -67,15 +67,22 @@ The implementation adheres to modern API standards, going beyond simple CRUD:
 
 # OUTPUT SCREENSHOTS:
 <img width="1920" height="371" alt="Image" src="https://github.com/user-attachments/assets/6bd7d8e5-a573-45c8-a9d8-c4eff9a54334" />
+
 <img width="1920" height="1020" alt="Image" src="https://github.com/user-attachments/assets/de9b4c83-8697-4fec-8b8b-1f4f4fd08e10" />
+
 <img width="1920" height="387" alt="Image" src="https://github.com/user-attachments/assets/09532f41-437c-4ce4-9bcc-e9b6f59099a1" />
+
 ## The Full List with Pagination:
 <img width="1920" height="1020" alt="Image" src="https://github.com/user-attachments/assets/e2ac1ac6-4383-41d0-ab4a-fa206cd4c3ba" />
+
 ## Filtering Functionality:
 <img width="1920" height="603" alt="Image" src="https://github.com/user-attachments/assets/faee6962-741d-4618-82a8-5b1aae9fdc97" />
+
 ## Successful Data Creation (POST)
 <img width="1920" height="371" alt="Image" src="https://github.com/user-attachments/assets/cab5b8ee-bdcc-43d3-a41a-9ed7e67c3daf" />
+
 ## Successful Data Modification (PUT or PATCH)
 <img width="1920" height="371" alt="Image" src="https://github.com/user-attachments/assets/7f565bb8-b2d8-422f-a15c-05c760868f1e" />
+
 ## Terminal(HTTP Status Code): 
 <img width="1432" height="376" alt="Image" src="https://github.com/user-attachments/assets/fc15bd29-2832-48af-8707-3caf435cf365" />
