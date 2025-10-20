@@ -191,6 +191,15 @@ if __name__ == '__main__':
         if not Book.query.first():
             b1 = Book(title="The Name of the Wind", author="Patrick Rothfuss", isbn="9780756404741", publication_year=2007, quantity=5)
             b2 = Book(title="A Memory of Light", author="Robert Jordan", isbn="9780765325950", publication_year=2013, quantity=10)
-            db.session.add_all([b1, b2])
+            b3 = Book(title="The Martian", author="Andy Weir", isbn="9780804139024", publication_year=2011, quantity=15)
+            b4 = Book(title="Project Hail Mary", author="Andy Weir", isbn="9780593136204", publication_year=2021, quantity=8)
+            b5 = Book(title="Where the Crawdads Sing", author="Delia Owens", isbn="9780735219090", publication_year=2018, quantity=2)
+            b6 = Book(title="Dune", author="Frank Herbert", isbn="9780441172719", publication_year=1965, quantity=20)
+            b7 = Book(title="Circe", author="Madeline Miller", isbn="9780316556347", publication_year=2018, quantity=7)
+            b8 = Book(title="The Hitchhiker's Guide to the Galaxy", author="Douglas Adams", isbn="9780345391803", publication_year=1979, quantity=12)
+            b9 = Book(title="Educated: A Memoir", author="Tara Westover", isbn="9780399592471", publication_year=2018, quantity=4)
+            b10 = Book(title="A Game of Thrones", author="George R.R. Martin", isbn="9780553381675", publication_year=1996, quantity=6)
+
+            db.session.add_all([b1, b2, b3, b4, b5, b6, b7, b8, b9, b10])
             db.session.commit()
     app.run(debug=True)
