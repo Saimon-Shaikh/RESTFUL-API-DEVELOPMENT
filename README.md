@@ -13,7 +13,7 @@
 *MENTOR NAME*: NEELA SANTOSH
 
 # TASK/PROJECT DESCRIPTION
-## Library Management RESTful API (CODTECH IT SOLUTIONS Internship):
+## Task 2: Library Management RESTful API (CODTECH IT SOLUTIONS Internship):
 This repository contains the source code for a professional, database-driven **RESTful API** built using Python's Flask framework. This project was developed as Task 2 of the CODTECH IT SOLUTIONS Software Developer Internship program, demonstrating core backend expertise, robust data persistence, and mastery of API design principles.
 
 ---
