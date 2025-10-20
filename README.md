@@ -12,13 +12,13 @@
 
 *MENTOR NAME*: NEELA SANTOSH
 
-# 📚 Task 2: Library Management RESTful API (CODTECH IT SOLUTIONS Internship)
-
-This repository contains the source code for a robust and persistent **RESTful API** built to manage a Library's book inventory. This project was developed as **Task 2** of the CODTECH IT SOLUTIONS Software Developer Internship program, demonstrating proficiency in backend development, database integration, and adherence to advanced REST architectural principles.
+# TASK/PROJECT DESCRIPTION
+## Library Management RESTful API (CODTECH IT SOLUTIONS Internship):
+This repository contains the source code for a professional, database-driven **RESTful API** built using Python's Flask framework. This project was developed as Task 2 of the CODTECH IT SOLUTIONS Software Developer Internship program, demonstrating core backend expertise, robust data persistence, and mastery of API design principles.
 
 ---
 
-## Project Overview
+## Project Overview:
 
 The primary goal was to create a professional API that provides full **CRUD** (Create, Read, Update, Delete) functionality for a `Book` resource. The core requirement was moving beyond volatile in-memory storage to **persistent database management** using an Object-Relational Mapper (ORM).
 
@@ -31,7 +31,7 @@ The primary goal was to create a professional API that provides full **CRUD** (C
 
 ---
 
-## Technical Implementation
+## Technical Implementation:
 
 The site's technical foundation is centered on Python Flask and the separation of application and data concerns.
 
@@ -64,8 +64,3 @@ The implementation adheres to modern API standards, going beyond simple CRUD:
 | **Database** | SQLite | Lightweight, file-based relational database (`library.db`) |
 | **API Client Tool** | Postman / Insomnia | Used for development and testing all CRUD endpoints |
 | **Integration** | Flask-CORS | Enables cross-origin requests for front-end consumption |
-```eof
-
-This README is now ready for your Task 2 repository! It clearly explains your architecture and highlights your best work.
-
-Are you ready to start setting up the WebSocket server and client for **Task 3: Real-Time Collaboration Tool**?
