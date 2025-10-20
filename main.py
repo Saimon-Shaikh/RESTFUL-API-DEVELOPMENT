@@ -1,33 +1,27 @@
-from flask import Flask, jsonify, request
+# Improved Flask RESTful API (single-file)
+from flask import Flask, jsonify, request, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
+from flask_cors import CORS
 import os
 
-# --- 1. Initialization and Configuration ---
 app = Flask(__name__)
+CORS(app)  # enable CORS for testing; configure origins in production
 
-# Configure SQLAlchemy to use a SQLite database file named 'library.db'
-# This file will be created in the current directory.
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
-# Recommended setting to silence a warning
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- 2. Database Model Definition (The Python Class for the 'book' table) ---
 class Book(db.Model):
-    """
-    Defines the structure of the 'book' table in the database.
-    This class represents the Book resource in our API.
-    """
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
     author = db.Column(db.String(120), nullable=False)
-    isbn = db.Column(db.String(20), unique=True, nullable=True) # Unique, optional ISBN
+    isbn = db.Column(db.String(20), unique=True, nullable=True)
     publication_year = db.Column(db.Integer, nullable=True)
-    quantity = db.Column(db.Integer, default=1)
+    quantity = db.Column(db.Integer, default=1, nullable=False)
 
     def to_dict(self):
-        """Converts the Book object to a dictionary for JSON serialization."""
         return {
             "id": self.id,
             "title": self.title,
@@ -36,112 +30,167 @@ class Book(db.Model):
             "publication_year": self.publication_year,
             "quantity": self.quantity,
         }
-    
-    def __repr__(self):
-        return f'<Book {self.title}>'
 
-# --- 3. CRUD Endpoints (Using SQLAlchemy) ---
+# Error handlers
+@app.errorhandler(400)
+def bad_request(e):
+    return jsonify({"message": "Bad request", "details": str(e)}), 400
 
-# --- R (Read All) and C (Create) ---
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"message": "Not found"}), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"message": "Internal server error", "details": str(e)}), 500
+
+def parse_json_request():
+    data = request.get_json(silent=True)
+    if data is None:
+        return None, (jsonify({"message": "Request body must be JSON"}), 400)
+    return data, None
+
+# Create / List with pagination and filtering
 @app.route('/api/books', methods=['GET', 'POST'])
 def books():
     if request.method == 'POST':
-        # C (Create) - Add a new book
-        data = request.get_json()
-        
-        # Basic Validation
-        if not data or 'title' not in data or 'author' not in data:
+        data, err = parse_json_request()
+        if err:
+            return err
+        if 'title' not in data or 'author' not in data:
             return jsonify({"message": "Invalid data. 'title' and 'author' are required."}), 400
-
         try:
-            # Create a new Book instance from the request data
-            new_book = Book(
-                title=data['title'],
-                author=data['author'],
-                # Use .get() for optional fields
-                isbn=data.get('isbn'), 
+            book = Book(
+                title=str(data['title']).strip(),
+                author=str(data['author']).strip(),
+                isbn=data.get('isbn'),
                 publication_year=data.get('publication_year'),
-                quantity=data.get('quantity', 1)
+                quantity=int(data.get('quantity', 1))
             )
-            
-            db.session.add(new_book)
-            db.session.commit() # Save the new record to the database
-            
-            # Returns 201 Created
-            return jsonify(new_book.to_dict()), 201
-            
+            db.session.add(book)
+            db.session.commit()
+            location = url_for('book_detail', book_id=book.id)
+            resp = jsonify(book.to_dict())
+            resp.status_code = 201
+            resp.headers['Location'] = location
+            return resp
+        except IntegrityError as ie:
+            db.session.rollback()
+            return jsonify({"message": "Integrity error", "details": "ISBN must be unique."}), 400
         except Exception as e:
-            # Rollback the session if an error occurs (e.g., non-unique ISBN)
-            db.session.rollback() 
-            # In a real app, log the error 'e'
-            return jsonify({"message": "Error creating book.", "error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"message": "Error creating book", "details": str(e)}), 500
 
-    # R (Read All) - Retrieve all books
-    elif request.method == 'GET':
-        # Query all records from the 'book' table
-        books = Book.query.all()
-        # Convert list of Book objects to list of dictionaries for JSON serialization
-        return jsonify([book.to_dict() for book in books])
+    # GET: list with optional filters + pagination
+    query = Book.query
+    # filters
+    author = request.args.get('author')
+    title = request.args.get('title')
+    isbn = request.args.get('isbn')
+    year = request.args.get('publication_year')
+    if author:
+        query = query.filter(Book.author.ilike(f"%{author}%"))
+    if title:
+        query = query.filter(Book.title.ilike(f"%{title}%"))
+    if isbn:
+        query = query.filter(Book.isbn == isbn)
+    if year:
+        try:
+            y = int(year)
+            query = query.filter(Book.publication_year == y)
+        except ValueError:
+            return jsonify({"message": "Invalid publication_year filter"}), 400
 
-# --- R (Read Single), U (Update), and D (Delete) ---
-@app.route('/api/books/<int:book_id>', methods=['GET', 'PUT', 'DELETE'])
+    # pagination
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = min(100, max(1, int(request.args.get('per_page', 10))))
+    except ValueError:
+        return jsonify({"message": "Invalid pagination parameters"}), 400
+
+    pag = query.paginate(page=page, per_page=per_page, error_out=False)
+    items = [b.to_dict() for b in pag.items]
+    return jsonify({
+        "items": items,
+        "total": pag.total,
+        "page": pag.page,
+        "per_page": pag.per_page,
+        "pages": pag.pages
+    })
+
+# Retrieve / Update / Partial update / Delete
+@app.route('/api/books/<int:book_id>', methods=['GET', 'PUT', 'PATCH', 'DELETE'])
 def book_detail(book_id):
-    # R (Read Single) - Find the book by primary key (ID)
     book = Book.query.get(book_id)
-    
     if book is None:
-        # Returns 404 Not Found
         return jsonify({"message": f"Book with id {book_id} not found."}), 404
 
     if request.method == 'GET':
         return jsonify(book.to_dict())
 
-    elif request.method == 'PUT':
-        # U (Update)
-        data = request.get_json()
-        
-        # Update fields only if they are provided in the request body
-        if 'title' in data:
-            book.title = data['title']
-        if 'author' in data:
-            book.author = data['author']
-        if 'isbn' in data:
-            book.isbn = data['isbn']
-        if 'publication_year' in data:
-            book.publication_year = data['publication_year']
-        if 'quantity' in data:
-            book.quantity = data['quantity']
-        
-        db.session.commit() # Save changes to the database
-        # Returns 200 OK
-        return jsonify(book.to_dict())
-
-    elif request.method == 'DELETE':
-        # D (Delete)
-        db.session.delete(book)
-        db.session.commit() # Execute the deletion
-        
-        # Returns 204 No Content (Standard response for successful deletion)
-        return '', 204
-
-# --- 4. Application Runner and Database Setup ---
-if __name__ == '__main__':
-    # Creates the application context required for database operations
-    with app.app_context():
-        # Creates the database tables defined by the 'Book' model if they don't exist
-        db.create_all() 
-        print("Database tables created/checked.")
-        
-        # Optional: Add initial mock data if the database is empty
-        if not Book.query.first():
-            print("Adding initial mock data...")
-            initial_books = [
-                Book(title="The Name of the Wind", author="Patrick Rothfuss", isbn="9780756404741", publication_year=2007, quantity=5),
-                Book(title="A Memory of Light", author="Robert Jordan", isbn="9780765325950", publication_year=2013, quantity=10),
-            ]
-            db.session.add_all(initial_books)
+    if request.method == 'PUT':
+        # Full replace — require title and author
+        data, err = parse_json_request()
+        if err:
+            return err
+        if 'title' not in data or 'author' not in data:
+            return jsonify({"message": "PUT requires 'title' and 'author'."}), 400
+        try:
+            book.title = str(data['title']).strip()
+            book.author = str(data['author']).strip()
+            book.isbn = data.get('isbn')
+            book.publication_year = data.get('publication_year')
+            book.quantity = int(data.get('quantity', book.quantity))
             db.session.commit()
-            print("Mock data added.")
-            
-    # Run the application
+            return jsonify(book.to_dict())
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"message": "ISBN must be unique."}), 400
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"message": "Error updating book", "details": str(e)}), 500
+
+    if request.method == 'PATCH':
+        # Partial update
+        data, err = parse_json_request()
+        if err:
+            return err
+        try:
+            if 'title' in data:
+                book.title = data['title']
+            if 'author' in data:
+                book.author = data['author']
+            if 'isbn' in data:
+                book.isbn = data['isbn']
+            if 'publication_year' in data:
+                book.publication_year = data['publication_year']
+            if 'quantity' in data:
+                book.quantity = int(data['quantity'])
+            db.session.commit()
+            return jsonify(book.to_dict())
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"message": "ISBN must be unique."}), 400
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"message": "Error updating book", "details": str(e)}), 500
+
+    if request.method == 'DELETE':
+        try:
+            db.session.delete(book)
+            db.session.commit()
+            return '', 204
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"message": "Error deleting book", "details": str(e)}), 500
+
+if __name__ == '__main__':
+    # Create DB + seed if empty
+    with app.app_context():
+        db.create_all()
+        if not Book.query.first():
+            b1 = Book(title="The Name of the Wind", author="Patrick Rothfuss", isbn="9780756404741", publication_year=2007, quantity=5)
+            b2 = Book(title="A Memory of Light", author="Robert Jordan", isbn="9780765325950", publication_year=2013, quantity=10)
+            db.session.add_all([b1, b2])
+            db.session.commit()
     app.run(debug=True)
