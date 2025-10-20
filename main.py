@@ -1,127 +1,147 @@
 from flask import Flask, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
+import os
 
+# --- 1. Initialization and Configuration ---
 app = Flask(__name__)
 
-# --- Mock Database (In-Memory List of Dictionaries) ---
-# NOTE: In a production environment, this would be replaced by a database connection (e.g., SQLAlchemy/SQLite).
-BOOK_DATA = [
-    {"id": 1, "title": "The Name of the Wind", "author": "Patrick Rothfuss", "isbn": "9780756404741", "publication_year": 2007, "quantity": 5},
-    {"id": 2, "title": "A Memory of Light", "author": "Robert Jordan", "isbn": "9780765325950", "publication_year": 2013, "quantity": 10},
-]
-# ID counter for new books
-next_book_id = 3 
+# Configure SQLAlchemy to use a SQLite database file named 'library.db'
+# This file will be created in the current directory.
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
+# Recommended setting to silence a warning
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 
-# --- Helper function to find a book by ID ---
-def find_book(book_id):
-    """Searches BOOK_DATA for a book with the given ID."""
-    for book in BOOK_DATA:
-        if book['id'] == book_id:
-            return book
-    return None
+db = SQLAlchemy(app)
 
-# --- R (Read All) ---
-@app.route('/api/books', methods=['GET'])
-def get_all_books():
+# --- 2. Database Model Definition (The Python Class for the 'book' table) ---
+class Book(db.Model):
     """
-    Retrieves a list of all books in the inventory.
-    Returns: JSON array of books.
+    Defines the structure of the 'book' table in the database.
+    This class represents the Book resource in our API.
     """
-    # Returns 200 OK by default
-    return jsonify(BOOK_DATA)
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    author = db.Column(db.String(120), nullable=False)
+    isbn = db.Column(db.String(20), unique=True, nullable=True) # Unique, optional ISBN
+    publication_year = db.Column(db.Integer, nullable=True)
+    quantity = db.Column(db.Integer, default=1)
 
-# --- C (Create) ---
-@app.route('/api/books', methods=['POST'])
-def add_book():
-    """
-    Adds a new book to the inventory.
-    Requires JSON input with 'title' and 'author'.
-    """
-    new_book = request.get_json()
+    def to_dict(self):
+        """Converts the Book object to a dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "author": self.author,
+            "isbn": self.isbn,
+            "publication_year": self.publication_year,
+            "quantity": self.quantity,
+        }
     
-    # 1. Input Validation: Check for required fields
-    if not new_book or 'title' not in new_book or 'author' not in new_book:
-        # Returns 400 Bad Request
-        return jsonify({"message": "Invalid book data provided. 'title' and 'author' are required."}), 400
+    def __repr__(self):
+        return f'<Book {self.title}>'
 
-    global next_book_id
-    
-    # 2. Assign properties and set defaults if missing
-    new_book['id'] = next_book_id
-    new_book['isbn'] = new_book.get('isbn', 'N/A')
-    new_book['publication_year'] = new_book.get('publication_year', None)
-    new_book['quantity'] = new_book.get('quantity', 1) 
-    
-    # 3. Add to the mock database
-    BOOK_DATA.append(new_book)
-    next_book_id += 1
-    
-    # Returns 201 Created and the new resource
-    return jsonify(new_book), 201 
+# --- 3. CRUD Endpoints (Using SQLAlchemy) ---
 
-# --- R (Read Single Book) ---
-@app.route('/api/books/<int:book_id>', methods=['GET'])
-def get_book_by_id(book_id):
-    """
-    Retrieves details for a specific book by its ID.
-    """
-    book = find_book(book_id)
+# --- R (Read All) and C (Create) ---
+@app.route('/api/books', methods=['GET', 'POST'])
+def books():
+    if request.method == 'POST':
+        # C (Create) - Add a new book
+        data = request.get_json()
+        
+        # Basic Validation
+        if not data or 'title' not in data or 'author' not in data:
+            return jsonify({"message": "Invalid data. 'title' and 'author' are required."}), 400
+
+        try:
+            # Create a new Book instance from the request data
+            new_book = Book(
+                title=data['title'],
+                author=data['author'],
+                # Use .get() for optional fields
+                isbn=data.get('isbn'), 
+                publication_year=data.get('publication_year'),
+                quantity=data.get('quantity', 1)
+            )
+            
+            db.session.add(new_book)
+            db.session.commit() # Save the new record to the database
+            
+            # Returns 201 Created
+            return jsonify(new_book.to_dict()), 201
+            
+        except Exception as e:
+            # Rollback the session if an error occurs (e.g., non-unique ISBN)
+            db.session.rollback() 
+            # In a real app, log the error 'e'
+            return jsonify({"message": "Error creating book.", "error": str(e)}), 500
+
+    # R (Read All) - Retrieve all books
+    elif request.method == 'GET':
+        # Query all records from the 'book' table
+        books = Book.query.all()
+        # Convert list of Book objects to list of dictionaries for JSON serialization
+        return jsonify([book.to_dict() for book in books])
+
+# --- R (Read Single), U (Update), and D (Delete) ---
+@app.route('/api/books/<int:book_id>', methods=['GET', 'PUT', 'DELETE'])
+def book_detail(book_id):
+    # R (Read Single) - Find the book by primary key (ID)
+    book = Book.query.get(book_id)
     
     if book is None:
         # Returns 404 Not Found
         return jsonify({"message": f"Book with id {book_id} not found."}), 404
+
+    if request.method == 'GET':
+        return jsonify(book.to_dict())
+
+    elif request.method == 'PUT':
+        # U (Update)
+        data = request.get_json()
         
-    return jsonify(book)
+        # Update fields only if they are provided in the request body
+        if 'title' in data:
+            book.title = data['title']
+        if 'author' in data:
+            book.author = data['author']
+        if 'isbn' in data:
+            book.isbn = data['isbn']
+        if 'publication_year' in data:
+            book.publication_year = data['publication_year']
+        if 'quantity' in data:
+            book.quantity = data['quantity']
+        
+        db.session.commit() # Save changes to the database
+        # Returns 200 OK
+        return jsonify(book.to_dict())
 
-# --- U (Update) ---
-@app.route('/api/books/<int:book_id>', methods=['PUT'])
-def update_book(book_id):
-    """
-    Updates all details for a specific book by its ID.
-    Requires JSON input containing the fields to update.
-    """
-    book_to_update = find_book(book_id)
-    
-    if book_to_update is None:
-        # Returns 404 Not Found
-        return jsonify({"message": f"Book with id {book_id} not found."}), 404
+    elif request.method == 'DELETE':
+        # D (Delete)
+        db.session.delete(book)
+        db.session.commit() # Execute the deletion
+        
+        # Returns 204 No Content (Standard response for successful deletion)
+        return '', 204
 
-    update_data = request.get_json()
-    
-    # Update properties of the book object in place
-    if 'title' in update_data:
-        book_to_update['title'] = update_data['title']
-    if 'author' in update_data:
-        book_to_update['author'] = update_data['author']
-    if 'isbn' in update_data:
-        book_to_update['isbn'] = update_data['isbn']
-    if 'publication_year' in update_data:
-        book_to_update['publication_year'] = update_data['publication_year']
-    if 'quantity' in update_data:
-        book_to_update['quantity'] = update_data['quantity']
-
-    # Returns 200 OK and the updated resource
-    return jsonify(book_to_update)
-
-# --- D (Delete) ---
-@app.route('/api/books/<int:book_id>', methods=['DELETE'])
-def delete_book(book_id):
-    """
-    Removes a book from the inventory by its ID.
-    """
-    global BOOK_DATA
-    original_length = len(BOOK_DATA)
-    
-    # Filter out the book with the matching ID
-    BOOK_DATA = [book for book in BOOK_DATA if book['id'] != book_id]
-    
-    if len(BOOK_DATA) == original_length:
-        # If the length hasn't changed, the book was not found
-        # Returns 404 Not Found
-        return jsonify({"message": f"Book with id {book_id} not found."}), 404
-    
-    # Returns 204 No Content (Standard response for successful deletion)
-    return '', 204 
-
+# --- 4. Application Runner and Database Setup ---
 if __name__ == '__main__':
-    # Run the application in debug mode on the standard port 5000
+    # Creates the application context required for database operations
+    with app.app_context():
+        # Creates the database tables defined by the 'Book' model if they don't exist
+        db.create_all() 
+        print("Database tables created/checked.")
+        
+        # Optional: Add initial mock data if the database is empty
+        if not Book.query.first():
+            print("Adding initial mock data...")
+            initial_books = [
+                Book(title="The Name of the Wind", author="Patrick Rothfuss", isbn="9780756404741", publication_year=2007, quantity=5),
+                Book(title="A Memory of Light", author="Robert Jordan", isbn="9780765325950", publication_year=2013, quantity=10),
+            ]
+            db.session.add_all(initial_books)
+            db.session.commit()
+            print("Mock data added.")
+            
+    # Run the application
     app.run(debug=True)
