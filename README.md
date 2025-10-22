@@ -65,7 +65,7 @@ The implementation adheres to modern API standards, going beyond simple CRUD:
 | **API Client Tool** | Postman / Insomnia | Used for development and testing all CRUD endpoints |
 | **Integration** | Flask-CORS | Enables cross-origin requests for front-end consumption |
 
-# OUTPUT SCREENSHOTS:
+# OUTPUT:
 <img width="1920" height="371" alt="Image" src="https://github.com/user-attachments/assets/6bd7d8e5-a573-45c8-a9d8-c4eff9a54334" />
 
 <img width="1920" height="1020" alt="Image" src="https://github.com/user-attachments/assets/de9b4c83-8697-4fec-8b8b-1f4f4fd08e10" />
